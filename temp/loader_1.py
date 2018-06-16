@@ -38,7 +38,7 @@ class VOC2007(Dataset):
             box = obj.find('bndbox')
             left, right = int(box.find('xmin').text), int(box.find('xmax').text)
             top, bottom = int(box.find('ymin').text), int(box.find('ymax').text)
-            boxes.append([name, left, right, top, bottom])
+            boxes.append([top, bottom, left, right, name])
 
         # return
         return image, boxes
@@ -50,7 +50,7 @@ def test_voc2007():
     fig, ax = plt.subplots()
     image, boxes = voc2007[random.randrange(len(voc2007))]
     plt.imshow(image)
-    for name, left, right, top, bottom in boxes:
+    for top, bottom, left, right, name in boxes:
         color = random.choice(['red', 'green', 'blue'])
         plt.text(left, top, name, color=color)
         rect = patches.Rectangle((left, top), (right - left), (bottom - top), edgecolor=color, linewidth=2, fill=False)
@@ -86,7 +86,7 @@ class VOC2012(Dataset):
             box = obj.find('bndbox')
             left, right = float(box.find('xmin').text), float(box.find('xmax').text)
             top, bottom = float(box.find('ymin').text), float(box.find('ymax').text)
-            boxes.append([name, left, right, top, bottom])
+            boxes.append([top, bottom, left, right, name])
         return filename, boxes
 
     def __len__(self):
@@ -115,7 +115,7 @@ def test_voc2012():
         fig, ax = plt.subplots()
         image, boxes = voc2012[random.randrange(len(voc2012))]
         plt.imshow(image)
-        for name, left, right, top, bottom in boxes:
+        for top, bottom, left, right, name in boxes:
             color = random.choice(['red', 'green', 'blue'])
             plt.text(left, top, name, color=color)
             rect = patches.Rectangle((left, top), (right - left), (bottom - top),
@@ -143,10 +143,10 @@ def image_padding(image, boxes, target_shape=(512, 512)):
 
     # adaptive boxes
     boxes_new = []
-    for name, left, right, top, bottom in boxes:
+    for top, bottom, left, right, name in boxes:
         left, right = left * scale + offset_w, right * scale + offset_w
         top, bottom = top * scale + offset_h, bottom * scale + offset_h
-        boxes_new.append([name, left, right, top, bottom])
+        boxes_new.append([top, bottom, left, right, name])
 
     #
     return target_image, boxes_new
@@ -159,7 +159,7 @@ def test_image_padding():
         image, boxes = voc2012[random.randrange(len(voc2012))]
         image, boxes = image_padding(image, boxes)
         plt.imshow(image)
-        for name, left, right, top, bottom in boxes:
+        for top, bottom, left, right, name in boxes:
             color = random.choice(['red', 'green', 'blue'])
             plt.text(left, top, name, color=color)
             rect = patches.Rectangle((left, top), (right - left), (bottom - top),
@@ -169,28 +169,25 @@ def test_image_padding():
         plt.close()
 
 
-def test_prior_boxes():
+def test_prior_boxes_1():
     voc2012 = VOC2012()
     image, boxes = voc2012[random.randrange(len(voc2012))]
     image, boxes = image_padding(image, boxes)
     print('num boxes: {}'.format(len(boxes)))
 
-    limit = {0: {'min': 0, 'max': 16},
-             1: {'min': 16, 'max': 32},
-             2: {'min': 32, 'max': 64},
-             3: {'min': 64, 'max': 128},
-             4: {'min': 128, 'max': 256},
-             5: {'min': 256, 'max': 512}}
-    for layer in range(6):
+    limit = {0: {'min': 0, 'max': 64},
+             1: {'min': 64, 'max': 256},
+             2: {'min': 256, 'max': 512}}
+    for layer in range(3):
         # switch plot
         fig, ax = plt.subplots()
         ax.imshow(image)
 
         #
-        scale = pow(2, layer)
+        scale = pow(4, layer)
 
         # loop boxes
-        for name, left, right, top, bottom in boxes:
+        for top, bottom, left, right, name in boxes:
             height, width = bottom - top, right - left
             mid_x, mid_y = (left + right) // 2, (top + bottom) // 2
 
@@ -201,13 +198,30 @@ def test_prior_boxes():
                 ax.add_patch(rect)
 
         #
-        image = transform.pyramid_reduce(image)
+        image = transform.pyramid_reduce(image, downscale=4)
 
     plt.show()
 
 
+def generate_prior_boxes_2(image, boxes):
+    label_index = {'aeroplane': 1, 'bicycle': 2, 'bird': 3, 'boat': 4, 'bottle': 5,
+                   'bus': 6, 'car': 7, 'cat': 8, 'chair': 9, 'cow': 10,
+                   'diningtable': 11, 'dog': 12, 'horse': 13, 'motorbike': 14, 'person': 15,
+                   'pottedplant': 16, 'sheep': 17, 'sofa': 18, 'train': 19, 'tvmonitor': 20}
+    loc = np.zeros(shape=[64 * 64 + 32 * 32 + 16 * 16, 4])
+    conf = np.zeros(shape=[64 * 64 + 32 * 32 + 16 * 16, 21])
+
+
+def test_prior_boxes_2():
+    voc2012 = VOC2012()
+    image, boxes = voc2012[random.randrange(len(voc2012))]
+    image, boxes = image_padding(image, boxes)
+
+    generate_prior_boxes_2(image, boxes)
+
+
 def main():
-    test_prior_boxes()
+    test_prior_boxes_2()
 
 
 if __name__ == '__main__':
